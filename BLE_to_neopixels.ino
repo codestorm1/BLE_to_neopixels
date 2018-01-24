@@ -27,6 +27,8 @@
 // This unit works now with LED
 // Testing pushbutton with 12 light neopixel, will tie to BLE later
 
+// TODO: clear pixels on new hour
+
 #include <Time.h>
 #include <TimeLib.h>
 #include <AltSoftSerial.h>
@@ -49,7 +51,7 @@ AltSoftSerial BTserial;
 
 #define PIXEL_PIN 6    // Digital IO pin connected to the NeoPixels.
 
-#define FORCE_TIME_UPDATE
+//#define FORCE_TIME_UPDATE
 #define BOARD_HAS_RTC 
 
 const int pixelCount = 12;
@@ -69,9 +71,6 @@ char c = ' ';
 boolean NL = true;
 int ledPin = 12;
 int curPixel = 0;
-int red = 1;
-int green = 1;
-int blue = 1;
 
 int pixelBuckets[pixelCount] = { 0 };
 
@@ -147,7 +146,6 @@ void setup()
     while (1);
   }
   setupTime();
-  
   digitalClockDisplay();
 }
 
@@ -157,25 +155,16 @@ int getMinutesPerPixel() {
 
 int getCurrentPixelBucket() {
   int hour12 = hour();
-  Serial.print("hour12: ");
-  Serial.println(hour12);
   hour12 = hour12 > 11 ? hour12 - 12 : hour12;
-  Serial.print("hour12 adj: ");
-  Serial.println(hour12);
   int curMinute = hour12 * 60 + minute();
-  Serial.print("minute: ");
-  Serial.println(curMinute);
   int bucket = curMinute / getMinutesPerPixel();
-  Serial.print("bucket: ");
-  Serial.println(bucket);
+  Serial.println(curMinute);
   return bucket;
 }
 
 uint32_t getColorForCount(int count) {
   const int maxCount = 9;
   count = count > maxCount - 1 ? maxCount - 1: count;
-  Serial.print("Count: ");
-  Serial.println(count);
   static uint32_t countColors[maxCount] = {
     pixels.Color(0, 0, 0), // off
     pixels.Color(255, 0, 0), // red
@@ -187,7 +176,6 @@ uint32_t getColorForCount(int count) {
     pixels.Color(220, 120, 220),  // violet
     pixels.Color(255, 255, 255)  // white
   };
-  Serial.println(countColors[count]);
   return countColors[count];
 }
 
@@ -205,13 +193,16 @@ void incrementPixel(int bucket) {
 void registerMotion() {
   int bucket = getCurrentPixelBucket();
   incrementPixel(bucket);
+  digitalClockDisplay();
+  Serial.print("Incrementing color for pixel ");
+  Serial.println(bucket);
 }
 
-void resetPixels() {
-  for (int i = 0; i < pixelCount; i++) {
-    updatePixelColor(i);
-  }
-}
+//void resetPixels() {
+//  for (int i = 0; i < pixelCount; i++) {
+//    updatePixelColor(i);
+//  }
+//}
 
 void checkBT() {
   // Read from the Bluetooth module and send to the Arduino Serial Monitor
@@ -221,6 +212,7 @@ void checkBT() {
     Serial.write(c);
     if (c == '1') {
       digitalWrite(ledPin, HIGH);
+      registerMotion();
     }
     else {
       digitalWrite(ledPin, LOW);
@@ -239,7 +231,8 @@ void checkButton() {
     // Check if button is still low after debounce.
     newState = digitalRead(BUTTON_PIN);
     if (newState == LOW) {
-      Serial.print(newState);
+      Serial.print("New motion state: ");
+      Serial.println(newState);
       registerMotion();
     }
   }
@@ -249,13 +242,12 @@ void checkButton() {
 }
 
 void checkInput() {
-  //checkBT();
+  checkBT();
   checkButton();
-
 }
 void loop()
 {
-  //    digitalWrite(ledPin, HIGH);
+  //digitalWrite(ledPin, HIGH);
   checkInput();
 }
 
