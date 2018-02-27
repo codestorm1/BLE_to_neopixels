@@ -12,7 +12,7 @@
 //  BT GND to GND
 //  Arduino D8 (SS RX) - BT TX no need voltage divider
 //  Arduino D9 (SS TX) - BT RX through a voltage divider (5v to 3.3v)
-//dfx6t
+
 
 // Quick Documentation
 // To set this module up, the HM-10 BLE needs to be set up in CENTRAL mode,
@@ -44,14 +44,14 @@ RTC_DS1307 rtc;
 AltSoftSerial BTserial;
 // https://www.pjrc.com/teensy/td_libs_AltSoftSerial.html
 
-#define BUTTON_PIN 2    // Digital IO pin connected to the button.  This will be
+const int buttonPin = 2; // Digital IO pin connected to the button.  This will be
 // driven with a pull-up resistor so the switch should
 // pull the pin to ground momentarily.  On a high -> low
 // transition the button press logic will execute.
 
-#define PIXEL_PIN 6    // Digital IO pin connected to the NeoPixels.
+const int pixelPin = 6;  // Digital IO pin connected to the NeoPixels.
 
-//#define FORCE_TIME_UPDATE
+#define FORCE_TIME_UPDATE
 #define BOARD_HAS_RTC 
 
 const int pixelCount = 12;
@@ -63,7 +63,7 @@ const int pixelCount = 12;
 //   NEO_GRB     Pixels are wired for GRB bitstream, correct for neopixel stick
 //   NEO_KHZ400  400 KHz bitstream (e.g. FLORA pixels)
 //   NEO_KHZ800  800 KHz bitstream (e.g. High Density LED strip), correct for neopixel stick
-Adafruit_NeoPixel pixels = Adafruit_NeoPixel(pixelCount, PIXEL_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel pixels = Adafruit_NeoPixel(pixelCount, pixelPin, NEO_GRB + NEO_KHZ800);
 
 bool oldState = LOW;
 int rate = 9600;
@@ -136,7 +136,10 @@ void setup()
   BTserial.begin(rate);
   Serial.print("BTserial started at ");
   Serial.println(rate);
+  
   pinMode(ledPin, OUTPUT);
+  pinMode(buttonPin, INPUT);
+  
   pixels.begin(); // This initializes the NeoPixel library.
   pixels.setBrightness(30);
   pixels.show();
@@ -158,6 +161,7 @@ int getCurrentPixelBucket() {
   hour12 = hour12 > 11 ? hour12 - 12 : hour12;
   int curMinute = hour12 * 60 + minute();
   int bucket = curMinute / getMinutesPerPixel();
+  Serial.print("Current minutes: ");
   Serial.println(curMinute);
   return bucket;
 }
@@ -209,30 +213,31 @@ void checkBT() {
   if (BTserial.available())
   {
     c = BTserial.read();
-    Serial.write(c);
+    Serial.println(c);
     if (c == '1') {
       digitalWrite(ledPin, HIGH);
+      Serial.println("Motion Detected");
       registerMotion();
     }
     else {
       digitalWrite(ledPin, LOW);
+      Serial.println("No Motion Detected");
     }
   }
 }
 
 void checkButton() {
   // Get current button state.
-  bool newState = digitalRead(BUTTON_PIN);
+  bool newState = digitalRead(buttonPin);
 
   // Check if state changed from high to low (button press).
   if (newState == LOW && oldState == HIGH) {
     // Short delay to debounce button.
     delay(20);
     // Check if button is still low after debounce.
-    newState = digitalRead(BUTTON_PIN);
+    newState = digitalRead(buttonPin);
     if (newState == LOW) {
-      Serial.print("New motion state: ");
-      Serial.println(newState);
+      Serial.println("<Button Press>");
       registerMotion();
     }
   }
