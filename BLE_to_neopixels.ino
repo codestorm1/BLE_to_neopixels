@@ -51,7 +51,7 @@ const int buttonPin = 2; // Digital IO pin connected to the button.  This will b
 
 const int pixelPin = 6;  // Digital IO pin connected to the NeoPixels.
 
-#define FORCE_TIME_UPDATE
+//#define FORCE_TIME_UPDATE
 #define BOARD_HAS_RTC 
 
 const int pixelCount = 12;
@@ -71,6 +71,8 @@ char c = ' ';
 boolean NL = true;
 int ledPin = 12;
 int curPixel = 0;
+const unsigned long debouncePeriod = 5 * 60 * 1000L; // don't increment led color more than once every 5 minutes
+unsigned long lastMotion = 0;
 
 int pixelBuckets[pixelCount] = { 0 };
 
@@ -183,10 +185,31 @@ uint32_t getColorForCount(int count) {
   return countColors[count];
 }
 
+void setPixel(int bucket, uint32_t color) {
+    pixels.setPixelColor(bucket, color);
+    pixels.show(); // This sends the updated pixel color to the hardware.
+}
+
+void blinkPixel(int times, int bucket, uint32_t color) {
+  const uint32_t offColor = pixels.Color(0, 0, 0);
+  for (int i = 0; i < times; i++) {
+    setPixel(bucket, color);
+    delay(1000);
+    
+    // set pixel to off, delay(1000)
+    setPixel(bucket, offColor);
+    delay(1000);
+  }
+}
+
+void setColorAndBlink(int bucket, uint32_t color) {
+  blinkPixel(10, bucket, color);
+  setPixel(bucket, color);
+}
+
 void updatePixelColor(int bucket) {
   uint32_t color = getColorForCount(pixelBuckets[bucket]);
-  pixels.setPixelColor(bucket, color);
-  pixels.show(); // This sends the updated pixel color to the hardware.
+  setColorAndBlink(bucket, color);
 }
 
 void incrementPixel(int bucket) {
@@ -194,9 +217,14 @@ void incrementPixel(int bucket) {
   updatePixelColor(bucket);
 }
 
+bool motionIsNew() {
+  return (lastMotion == 0) || (millis() - lastMotion > debouncePeriod);
+}
+
 void registerMotion() {
   int bucket = getCurrentPixelBucket();
   incrementPixel(bucket);
+  lastMotion = millis();
   digitalClockDisplay();
   Serial.print("Incrementing color for pixel ");
   Serial.println(bucket);
@@ -217,7 +245,9 @@ void checkBT() {
     if (c == '1') {
       digitalWrite(ledPin, HIGH);
       Serial.println("Motion Detected");
-      registerMotion();
+      if (motionIsNew()) {
+        registerMotion();
+      }
     }
     else {
       digitalWrite(ledPin, LOW);
@@ -238,7 +268,9 @@ void checkButton() {
     newState = digitalRead(buttonPin);
     if (newState == LOW) {
       Serial.println("<Button Press>");
-      registerMotion();
+      if (motionIsNew()) {
+        registerMotion();
+      }
     }
   }
 
